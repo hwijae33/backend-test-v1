@@ -1,6 +1,7 @@
 package im.bigs.pg.application.payment.port.`in`
 
 import java.math.BigDecimal
+import java.time.LocalDateTime
 
 /**
  * 결제 생성에 필요한 최소 입력.
@@ -17,5 +18,5 @@ data class PaymentCommand(
     val cardBin: String? = null,
     val cardLast4: String? = null,
     val productName: String? = null,
+    val requestAt: LocalDateTime
 )
-
