@@ -1,5 +1,6 @@
 package im.bigs.pg.infra.persistence.payment.adapter
 
+import im.bigs.pg.application.payment.port.out.ApprovalLookupFilter
 import im.bigs.pg.application.payment.port.out.PaymentOutPort
 import im.bigs.pg.application.payment.port.out.PaymentPage
 import im.bigs.pg.application.payment.port.out.PaymentQuery
@@ -9,9 +10,10 @@ import im.bigs.pg.domain.payment.Payment
 import im.bigs.pg.domain.payment.PaymentStatus
 import im.bigs.pg.infra.persistence.payment.entity.PaymentEntity
 import im.bigs.pg.infra.persistence.payment.repository.PaymentJpaRepository
-import java.time.ZoneOffset
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Component
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 
 /** PaymentOutPort 구현체(JPA 기반). */
 @Component
@@ -56,6 +58,20 @@ class PaymentPersistenceAdapter(
         val totalAmount = arr[1] as java.math.BigDecimal
         val totalNet = arr[2] as java.math.BigDecimal
         return PaymentSummaryProjection(cnt, totalAmount, totalNet)
+    }
+
+    override fun findByPartnerApprovalOnDay(filter: ApprovalLookupFilter): Payment? {
+        val dayStart = filter.approvedDateUtc
+            .atStartOfDay(ZoneOffset.UTC)
+            .toInstant()
+        val nextDay = dayStart.plus(1, ChronoUnit.DAYS)
+
+        return repo.findOneByPartnerApprovalOnDay(
+            filter.partnerId,
+            filter.approvalCode,
+            dayStart,
+            nextDay
+        ).map { it.toDomain() }.orElse(null)
     }
 
     /** 도메인 → 엔티티 매핑. */

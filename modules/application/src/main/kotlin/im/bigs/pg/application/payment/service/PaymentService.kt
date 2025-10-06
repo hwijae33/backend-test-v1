@@ -2,8 +2,9 @@ package im.bigs.pg.application.payment.service
 
 import im.bigs.pg.application.partner.port.out.FeePolicyOutPort
 import im.bigs.pg.application.partner.port.out.PartnerOutPort
-import im.bigs.pg.application.payment.port.`in`.PaymentUseCase
 import im.bigs.pg.application.payment.port.`in`.PaymentCommand
+import im.bigs.pg.application.payment.port.`in`.PaymentUseCase
+import im.bigs.pg.application.payment.port.out.ApprovalLookupFilter
 import im.bigs.pg.application.payment.port.out.PaymentOutPort
 import im.bigs.pg.application.pg.port.out.PgApproveRequest
 import im.bigs.pg.application.pg.port.out.PgClientOutPort
@@ -11,6 +12,7 @@ import im.bigs.pg.domain.calculation.FeeCalculator
 import im.bigs.pg.domain.payment.Payment
 import im.bigs.pg.domain.payment.PaymentStatus
 import org.springframework.stereotype.Service
+import java.time.ZoneOffset
 
 /**
  * 결제 생성 유스케이스 구현체.
@@ -23,6 +25,7 @@ class PaymentService(
     private val feePolicyRepository: FeePolicyOutPort,
     private val paymentRepository: PaymentOutPort,
     private val pgClients: List<PgClientOutPort>,
+
 ) : PaymentUseCase {
     /**
      * 결제 승인/수수료 계산/저장을 순차적으로 수행합니다.
@@ -46,13 +49,31 @@ class PaymentService(
                 productName = command.productName,
             ),
         )
-        val hardcodedRate = java.math.BigDecimal("0.0300")
-        val hardcodedFixed = java.math.BigDecimal("100")
-        val (fee, net) = FeeCalculator.calculateFee(command.amount, hardcodedRate, hardcodedFixed)
+
+        val approvedDateUtc = approve.approvedAt.atOffset(ZoneOffset.UTC).toLocalDate()
+        val idemFilter = ApprovalLookupFilter(
+            partnerId = partner.id,
+            approvalCode = approve.approvalCode,
+            approvedDateUtc = approvedDateUtc
+        )
+        paymentRepository.findByPartnerApprovalOnDay(idemFilter)?.let { it ->
+            println("Idempotent replay: partnerId=${partner.id}, approvalCode=${approve.approvalCode}, date=$approvedDateUtc, paymentId=${it.id}")
+            return  it }
+
+        val policyAt = approve.approvedAt.toInstant(ZoneOffset.UTC)
+        val policy = feePolicyRepository.findEffectivePolicy(partner.id, policyAt)
+            ?: throw IllegalStateException("No fee policy for partner ${partner.id} at ${approve.approvedAt}")
+
+        val (fee, net) = FeeCalculator.calculateFee(
+            amount = command.amount,
+            rate = policy.percentage,
+            fixed = policy.fixedFee
+        )
+
         val payment = Payment(
             partnerId = partner.id,
             amount = command.amount,
-            appliedFeeRate = hardcodedRate,
+            appliedFeeRate = policy.percentage,
             feeAmount = fee,
             netAmount = net,
             cardBin = command.cardBin,
@@ -60,6 +81,8 @@ class PaymentService(
             approvalCode = approve.approvalCode,
             approvedAt = approve.approvedAt,
             status = PaymentStatus.APPROVED,
+            createdAt = command.requestAt,
+            updatedAt = command.requestAt
         )
 
         return paymentRepository.save(payment)

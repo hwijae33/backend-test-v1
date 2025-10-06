@@ -1,6 +1,7 @@
 package im.bigs.pg.application.payment.port.out
 
 import im.bigs.pg.domain.payment.Payment
+import java.time.LocalDateTime
 
 /**
  * 영속성 어댑터가 구현할 출력 포트.
@@ -12,4 +13,6 @@ interface PaymentOutPort {
     fun findBy(query: PaymentQuery): PaymentPage
 
     fun summary(filter: PaymentSummaryFilter): PaymentSummaryProjection
+
+    fun findByPartnerApprovalOnDay(filter: ApprovalLookupFilter): Payment?
 }

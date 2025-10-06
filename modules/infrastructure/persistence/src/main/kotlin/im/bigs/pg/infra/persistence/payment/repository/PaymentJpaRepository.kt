@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.Instant
+import java.util.Optional
 
 /** 결제 이력 조회용 JPA 리포지토리. */
 interface PaymentJpaRepository : JpaRepository<PaymentEntity, Long> {
@@ -54,4 +55,22 @@ interface PaymentJpaRepository : JpaRepository<PaymentEntity, Long> {
         @Param("fromAt") fromAt: Instant?,
         @Param("toAt") toAt: Instant?,
     ): List<Array<Any>>
+
+    /** 거래 멱등성 조회. */
+    @Query(
+        """
+        select p from PaymentEntity p
+        where p.partnerId   = :partnerId
+          and p.approvalCode = :approvalCode
+          and p.approvedAt  >= :dayStartInclusive
+          and p.approvedAt  <  :nextDayExclusive
+        order by p.id desc
+        """
+    )
+    fun findOneByPartnerApprovalOnDay(
+        @Param("partnerId") partnerId: Long,
+        @Param("approvalCode") approvalCode: String,
+        @Param("dayStartInclusive") dayStartInclusive: Instant,
+        @Param("nextDayExclusive") nextDayExclusive: Instant
+    ): Optional<PaymentEntity>
 }
