@@ -57,7 +57,10 @@ class PaymentService(
             approvedDateUtc = approvedDateUtc
         )
         paymentRepository.findByPartnerApprovalOnDay(idemFilter)?.let { it ->
-            println("Idempotent replay: partnerId=${partner.id}, approvalCode=${approve.approvalCode}, date=$approvedDateUtc, paymentId=${it.id}")
+            println(
+                "Idempotent replay: partnerId=${partner.id}, approvalCode=${approve.approvalCode}, " +
+                        "date=$approvedDateUtc, paymentId=${it.id}"
+            )
             return  it }
 
         val policyAt = approve.approvedAt.toInstant(ZoneOffset.UTC)
