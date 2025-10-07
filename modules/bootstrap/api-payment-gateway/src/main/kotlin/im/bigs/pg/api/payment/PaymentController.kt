@@ -43,7 +43,7 @@ class PaymentController(
      * @param req 결제 요청 본문
      * @return 생성된 결제 요약 응답
      */
-    @PostMapping("/api/v1/payments")
+    @PostMapping
     fun create(@RequestBody req: CreatePaymentRequest): ResponseEntity<PaymentResponse> {
         val saved = paymentUseCase.pay(
             PaymentCommand(
@@ -83,6 +83,7 @@ class PaymentController(
         val res = queryPaymentsUseCase.query(
             QueryFilter(partnerId, status, from, to, cursor, limit),
         )
+
         return ResponseEntity.ok(
             QueryResponse(
                 items = res.items.map { PaymentResponse.from(it) },
